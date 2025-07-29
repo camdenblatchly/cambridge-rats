@@ -1,0 +1,40 @@
+---
+title: "rats"
+author: "Camden Blatchly"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(sf)
+library(here)
+library(readr)
+library(lubridate)
+
+i_am("scripts/rats.qmd")
+
+```
+
+
+```{r}
+
+dta_311 <- read_csv(here("data/311.csv"))
+
+```
+
+
+```{r}
+
+dta_311_clean <- dta_311 %>%
+  mutate(
+    geoid_bl = stringr::str_pad(`Block Code`, 15, side = "left", pad = "0")
+  ) %>%
+  select(geoid_bl, everything())
+
+```
+
+
+
