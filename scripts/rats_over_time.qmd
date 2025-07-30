@@ -1,0 +1,75 @@
+---
+title: "rats_over_time"
+author: "Camden Blatchly"
+format: html
+editor: visual
+---
+
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(sf)
+library(here)
+library(readr)
+library(lubridate)
+
+i_am("scripts/rats_over_time.qmd")
+
+```
+
+
+```{r}
+
+somerville_311 <- read_csv(here("data/somerville_311.csv"))
+cambridge_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
+
+```
+```{r}
+
+somerville_311_clean <- somerville_311 %>%
+  mutate(
+    geoid_bl = stringr::str_pad(`Block Code`, 15, side = "left", pad = "0")
+  ) %>%
+  select(geoid_bl, everything()) %>%
+  mutate(
+    year = lubridate::year(`Date Created`)
+  )
+  
+
+cambridge_311_clean <- cambridge_311 %>%
+  mutate(
+    date_created = mdy_hms(ticket_created_date_time, locale = "C"),
+    year = year(date_created)
+  )
+
+```
+
+
+```{r}
+
+cambridge_trends <- cambridge_311_clean %>%
+  group_by(year) %>%
+  summarise(
+    total = n(),
+    rodent = sum(issue_type == "Rodent Sighting"),
+    rodent_pct = (rodent / total) * 100
+  )
+
+```
+
+
+```{r}
+
+somerville_trends <- somerville_311_clean %>%
+  group_by(year) %>%
+  summarise(
+    total = n(),
+    rodent = sum(`Request Type` == "Rats"),
+    rodent_pct = (rodent / total) * 100
+  )
+
+```
+
+

@@ -19,35 +19,18 @@ i_am("scripts/open_data_exploration.qmd")
 
 ```
 
-
 ```{r}
 
-dta_311 <- read_csv(here("data/311.csv"))
+dta_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
 
 ```
-
-
-```{r}
-
-dta_311_recent <- dta_311 %>%
-  filter(`Date Created` >= ymd("2024-01-01"))
-
-```
-
 
 ```{r}
 
 most_common_311 <- dta_311 %>%
-  group_by(`Request Type`) %>%
+  group_by(issue_type) %>%
   summarise(
     count = n()
   )
-
-```
-
-
-```{r}
-
-permits <- readr::read_csv(here("data/Permits_20250724.csv"))
 
 ```

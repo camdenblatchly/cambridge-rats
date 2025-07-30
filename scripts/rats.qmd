@@ -21,20 +21,120 @@ i_am("scripts/rats.qmd")
 
 ```{r}
 
-dta_311 <- read_csv(here("data/311.csv"))
+somerville_311 <- read_csv(here("data/somerville_311.csv"))
+cambridge_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
 
 ```
 
 
 ```{r}
 
-dta_311_clean <- dta_311 %>%
+somerville_311_rats_clean <- somerville_311 %>%
   mutate(
     geoid_bl = stringr::str_pad(`Block Code`, 15, side = "left", pad = "0")
   ) %>%
-  select(geoid_bl, everything())
+  select(geoid_bl, everything()) %>%
+  filter(`Request Type` == "Rats") %>%
+  mutate(
+    year = lubridate::year(`Date Created`)
+  )
+  
+readr::write_csv(somerville_311_rats_clean, here("data/somerville_311_rats_clean.csv"))
+
+cambridge_311_rats_clean <- cambridge_311 %>%
+  filter(issue_type == "Rodent Sighting") %>%
+  st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
+  mutate(
+    date_created = mdy_hms(ticket_created_date_time, locale = "C"),
+    year = year(date_created)
+  )
+
+readr::write_csv(cambridge_311_rats_clean, here("data/cambridge_311_rats_clean.csv"))
 
 ```
+
+
+```{r}
+
+## Validity checks
+
+# How many unique IDs
+somerville_311_clean %>% pull(ID) %>% unique() %>% length()
+
+```
+
+
+```{r}
+
+rodent_categories <- c(
+  "Rats",
+  "Mice",
+  "Dead animal"
+)
+
+rodent_dta <- somerville_311_clean %>%
+  filter(`Request Category` == "Animals & Pets") %>%
+  filter(`Request Type` %in% rodent_categories)
+
+```
+
+
+```{r}
+
+# Let's map where 311 requests are happening
+# Note: Do we need to normalize on area? Dot density?
+
+middlesex_co_bl <- tigris::blocks("MA", county = "017", year = 2020)
+
+```
+
+
+```{r}
+
+rodent_geo <- left_join(
+  rodent_dta %>%
+    group_by(geoid_bl) %>%
+    summarise(
+      count = n()
+    ),
+  middlesex_co_bl,
+  by = c("geoid_bl" = "GEOID20")
+)
+
+st_write(rodent_geo, here("data/somerville_rodent_311_blocks.geojson"), driver = "GeoJSON")
+
+```
+
+```{r}
+
+# Let's make a Cambridge, MA file
+cambridge_rodent_dta <- cambridge_311 %>%
+  filter(issue_type == "Rodent Sighting") %>%
+  st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
+  st_transform(st_crs(middlesex_co_bl)) %>%
+  st_join(
+    .,
+    middlesex_co_bl,
+    join = st_within
+  ) %>%
+  sf::st_drop_geometry()
+
+cambridge_rodent_bl_dta <- cambridge_rodent_dta %>%
+  group_by(GEOID20) %>%
+  summarise(
+    count = n()
+  ) %>%
+  left_join(
+    .,
+    middlesex_co_bl %>% select(GEOID20, geometry) %>% distinct(),
+    by = "GEOID20"
+  )
+
+st_write(cambridge_rodent_bl_dta, here("data/cambridge_rodent_311_blocks.geojson"), driver = "GeoJSON")
+
+```
+
+
 
 
 
