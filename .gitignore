@@ -74,3 +74,5 @@ ipython_config.py
 rosm.cache/
 
 README.html
+
+.env

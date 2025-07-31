@@ -5,7 +5,6 @@ format: html
 editor: visual
 ---
 
-
 ```{r}
 
 library(dplyr)
@@ -19,13 +18,13 @@ i_am("scripts/rats_over_time.qmd")
 
 ```
 
-
 ```{r}
 
 somerville_311 <- read_csv(here("data/somerville_311.csv"))
 cambridge_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
 
 ```
+
 ```{r}
 
 somerville_311_clean <- somerville_311 %>%
@@ -46,7 +45,6 @@ cambridge_311_clean <- cambridge_311 %>%
 
 ```
 
-
 ```{r}
 
 cambridge_trends <- cambridge_311_clean %>%
@@ -59,6 +57,24 @@ cambridge_trends <- cambridge_311_clean %>%
 
 ```
 
+```{r}
+
+library(ggplot2)
+
+fig <- cambridge_trends %>%
+  filter(year > 2015 & year < 2025) %>%
+  ggplot(aes(x = year, y = rodent)) +
+    geom_line(color = "darkred", size = 1) +
+    geom_point(color = "darkred", size = 2) +
+    labs(
+      title = "Cambridge 311",
+      x = "Year",
+      y = "Value"
+    ) +
+    theme_minimal()
+
+fig
+```
 
 ```{r}
 
@@ -72,4 +88,22 @@ somerville_trends <- somerville_311_clean %>%
 
 ```
 
+```{r}
 
+library(ggplot2)
+
+fig <- somerville_trends %>%
+  filter(year > 2015 & year < 2025) %>%
+  ggplot(aes(x = year, y = rodent)) +
+    geom_line(color = "darkred", size = 1) +
+    geom_point(color = "darkred", size = 2) +
+    labs(
+      title = "Somerville 311",
+      x = "Year",
+      y = "Total"
+    ) +
+    theme_minimal()
+
+fig
+
+```

@@ -1,0 +1,155 @@
+---
+title: "rats"
+author: "Camden Blatchly"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(sf)
+library(here)
+library(readr)
+library(lubridate)
+
+i_am("scripts/rats_spatial.qmd")
+
+```
+
+```{r}
+
+somerville_311 <- read_csv(here("data/somerville_311.csv"))
+cambridge_311 <- read_csv(here("data/cambridge_ma_311_rat_flags_data.csv"))
+
+```
+
+```{r}
+
+somerville_311_clean <- somerville_311 %>%
+  mutate(
+    geoid_bl = stringr::str_pad(`Block Code`, 15, side = "left", pad = "0")
+  ) %>%
+  select(geoid_bl, everything()) %>%
+  mutate(
+    year = lubridate::year(`Date Created`)
+  ) %>%
+  filter(year > 2015 & year < 2025)
+  
+cambridge_311_clean <- cambridge_311 %>%
+  st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
+  mutate(
+    date_created = mdy_hms(ticket_created_date_time, locale = "C"),
+    year = year(date_created)
+  ) %>%
+  filter(year > 2015 & year < 2025)
+
+
+```
+
+```{r}
+
+# Let's map where 311 requests are happening
+# Note: Do we need to normalize on area? Dot density?
+
+middlesex_co_bl <- tigris::blocks("MA", county = "017", year = 2020) %>%
+  tigris::erase_water() %>%
+  st_make_valid()
+
+```
+
+```{r}
+
+# Let's make a Cambridge, MA Census block geo file
+cambridge_rat_bl_dta <- cambridge_311_clean %>%
+  st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
+  st_transform(st_crs(middlesex_co_bl)) %>%
+  # Associate with Census blocks
+  st_join(
+    .,
+    middlesex_co_bl,
+    join = st_within
+  ) %>%
+  sf::st_drop_geometry() %>%
+  rename(geoid_bl = GEOID20) %>%
+  # Calculate totals by year and Census block
+  group_by(year, geoid_bl) %>%
+  summarise(
+    total = n(),
+    rat = sum(is_likely_rat == TRUE),
+    pop = mean(POP20),
+    aland = mean(ALAND20)
+  ) %>%
+  # Calculate average and median 311 by block
+  group_by(geoid_bl) %>%
+  summarise(
+    # 2020 pop
+    pop = mean(pop, na.rm = TRUE),
+    aland = mean(aland, na.rm = TRUE),
+    # Total 311 requests
+    avg_total = mean(total, na.rm = TRUE),
+    median_total = median(total, na.rm = TRUE),
+    avg_total_pa = avg_total / aland,
+    median_total_pa = median_total / aland,
+    # Rodent requests
+    avg_rat = mean(rat, na.rm = TRUE),
+    median_rat = median(rat, na.rm = TRUE),
+    avg_rat_pa = avg_rat/ aland,
+    median_rat_pa = median_rat / aland
+  ) %>%
+  left_join(
+    .,
+    middlesex_co_bl %>% select(GEOID20, geometry) %>% distinct(),
+    by = c("geoid_bl" = "GEOID20")
+  ) %>%
+  sf::st_as_sf()
+
+st_write(cambridge_rat_bl_dta, here("data/cambridge_rat_311_blocks.geojson"), driver = "GeoJSON")
+
+```
+
+```{r}
+
+somerville_rats_311_blocks <- left_join(
+    somerville_311_clean,
+    middlesex_co_bl,
+    by = c("geoid_bl" = "GEOID20")
+  ) %>%
+  sf::st_drop_geometry() %>%
+  # Calculate totals by year and Census block
+  group_by(year, geoid_bl) %>%
+  summarise(
+    total = n(),
+    rodent = sum(`Request Type` == "Rats"),
+    pop = mean(POP20),
+    aland = mean(ALAND20)
+  ) %>%
+  # Calculate average and median 311 by block
+  group_by(geoid_bl) %>%
+  summarise(
+    # 2020 pop
+    pop = mean(pop, na.rm = TRUE),
+    aland = mean(aland, na.rm = TRUE),
+    # Total 311 requests
+    avg_total = mean(total, na.rm = TRUE),
+    median_total = median(total, na.rm = TRUE),
+    avg_total_pa = avg_total / aland,
+    median_total_pa = median_total / aland,
+    # Rodent requests
+    avg_rodent = mean(rodent, na.rm = TRUE),
+    median_rodent = median(rodent, na.rm = TRUE),
+    avg_rodent_pa = avg_rodent / aland,
+    median_rodent_pa = median_rodent / aland
+  ) %>%
+  left_join(
+    .,
+    middlesex_co_bl %>% select(GEOID20, geometry) %>% distinct(),
+    by = c("geoid_bl" = "GEOID20")
+  ) %>%
+  sf::st_as_sf()
+  
+
+st_write(somerville_rats_311_blocks, here("data/somerville_rats_311_blocks.geojson"), driver = "GeoJSON")
+
+```

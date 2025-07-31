@@ -1,0 +1,19 @@
+---
+title: "rat_traps"
+author: "Camden Blatchly"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(sf)
+library(here)
+library(readr)
+library(lubridate)
+
+i_am("scripts/rat_traps.qmd")
+
+```

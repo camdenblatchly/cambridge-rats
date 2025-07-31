@@ -1,0 +1,172 @@
+---
+title: "create_full_rats_dataset"
+author: "Camden Blatchly"
+format: html
+editor: visual
+---
+
+```{r}
+
+library(dplyr)
+library(tidyr)
+library(sf)
+library(here)
+library(readr)
+library(lubridate)
+library(stringr)
+
+i_am("scripts/create_full_rats_dataset.qmd")
+
+```
+
+```{r}
+
+cambridge_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
+
+```
+
+```{r}
+
+# Create rat related dataset
+rodent_related <- cambridge_311 %>%
+  mutate(
+    issue_text_full = paste0(issue_type, ". ", issue_description)
+  ) %>%
+  mutate(
+    # Check if these keywords are mentioned
+    is_rat_related = str_detect(issue_text_full, regex("\\brats?\\b", ignore_case = TRUE)),
+    is_rodent_related = str_detect(issue_description, regex("\\brodents?\\b", ignore_case = TRUE)),
+    is_mice_related = str_detect(issue_description, regex("\\bmice\\b", ignore_case = TRUE)),
+    is_mouse_related = str_detect(issue_description, regex("\\bmouse\\b", ignore_case = TRUE)),
+    is_raccoon_related = str_detect(issue_description, regex("\\braccoons?\\b", ignore_case = TRUE)),
+    # Because people misspell!
+    is_racoon_related = str_detect(issue_description, regex("\\bracoons?\\b", ignore_case = TRUE)),
+    is_rabbit_related = str_detect(issue_description, regex("\\brabbits?\\b", ignore_case = TRUE)),
+  )
+
+```
+
+```{r}
+
+# Quick checks to determine if it is fair to assume if an unspecified Rodent Sighting is 
+# submitted, then it is likely about Rats
+
+# Percent with rat mention
+pct_rat_mention <- rodent_related %>%
+  filter(!is.na(issue_description)) %>%
+  summarise(
+    total = n(),
+    total_rat = sum(is_rat_related == TRUE),
+    rat_pct = (total_rat / total) * 100
+  ) %>%
+  pull(rat_pct) %>% 
+  nth(1) %>%
+  round(2)
+
+print(paste0(pct_rat_mention, "% of 311 report descriptions mention rats"))
+
+# Percent of Rodent sightings with rat mention
+pct_rodent_sightings_with_rat_mention <- rodent_related %>%
+  filter(!is.na(issue_description)) %>%
+  filter(issue_category == "Rodent Sighting") %>%
+  summarise(
+    total = n(),
+    total_rat = sum(is_rat_related == TRUE),
+    rat_pct = (total_rat / total) * 100
+  ) %>%
+  pull(rat_pct) %>% 
+  nth(1) %>%
+  round(2)
+
+print(paste0(pct_rodent_sightings_with_rat_mention, "% of 311 Rodent Sighting reports mention rats"))
+
+# Percent with rat mention by Issue Category
+pct_rat_mention_by_issue_category <- rodent_related %>%
+  filter(!is.na(issue_description)) %>%
+  group_by(issue_category) %>%
+  summarise(
+    total = n(),
+    total_rat = sum(is_rat_related == TRUE),
+    rat_pct = (total_rat / total) * 100
+  )
+
+# Percent of Rodent Sightings with no description
+pct_no_description <- rodent_related %>%
+  filter(issue_category == "Rodent Sighting") %>%
+  summarise(
+    total = n(),
+    total_no_desc = sum(is.na(issue_description)),
+    no_desc_pct = (total_no_desc / total) * 100
+  ) %>%
+  pull(no_desc_pct) %>% 
+  nth(1) %>%
+  round(2)
+
+print(paste0(pct_no_description, "% of 311 Rodent Sighting reports have no description"))
+
+# Percent with No rat mention AND other rodent mention
+pct_no_rat_but_other_rodent_mention <- rodent_related %>%
+  filter(!is_rat_related) %>%
+  summarise(
+    total = n(),
+    total_other_rodent = sum(is_mice_related | is_mouse_related | is_raccoon_related | is_rabbit_related | is_racoon_related, na.rm = TRUE),
+    other_rodent_pct = (total_other_rodent / total) * 100
+  ) %>%
+  pull(other_rodent_pct) %>% 
+  nth(1) %>%
+  round(2)
+
+print(paste0(pct_no_rat_but_other_rodent_mention, "% of 311 report descriptions don't mention rats, but DO mention rabbits, mice, or raccoons"))
+
+```
+
+```{r}
+
+## Build my complete Rat dataset!
+
+# I want all 311 records that:
+
+# Mention rats
+specific_rat_mentions <- rodent_related %>%
+  filter(is_rat_related)
+
+# Are Rodent Sightings or rodent mentions
+# that don't mention Rats
+# But also don't mention other rodents
+#
+# So, therefore, they are probably about rats!
+# 
+# Data: 79.08% of Rodent Sightings with a description mentioned rats
+likely_rat_reports <- rodent_related %>%
+  filter(issue_category == "Rodent Sighting" | is_rodent_related == TRUE) %>%
+  filter(!is_rat_related) %>%
+  filter(!is_mice_related & !is_mouse_related & !is_raccoon_related & !is_racoon_related & !is_rabbit_related)
+
+cambridge_full_rat_data <- bind_rows(
+    specific_rat_mentions,
+    likely_rat_reports
+  ) %>%
+  distinct()
+
+readr::write_csv(cambridge_full_rat_data, here("data/cambridge_ma_rat_only_data.csv"))
+
+# Also create one which keeps ALL records but adds a likely rats flag
+cambridge_full_data_with_flags <- rodent_related %>%
+  mutate(
+    is_likely_rat = is_rat_related | (
+      (issue_category == "Rodent Sighting" | is_rodent_related) &
+        (
+          !is_rat_related & 
+          !is_mice_related & 
+          !is_mouse_related & 
+          !is_raccoon_related & 
+          !is_racoon_related & 
+          !is_rabbit_related
+        )
+      ),
+    is_likely_rat = replace_na(is_likely_rat, FALSE)
+  )
+
+readr::write_csv(cambridge_full_data_with_flags, here("data/cambridge_ma_311_rat_flags_data.csv"))
+
+```
