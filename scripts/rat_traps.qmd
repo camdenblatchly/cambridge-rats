@@ -17,3 +17,15 @@ library(lubridate)
 i_am("scripts/rat_traps.qmd")
 
 ```
+
+```{r}
+
+dta_raw <- read_csv(here("data/Smart_Rat_Boxes_20250730.csv"))
+
+```
+
+```{r}
+
+
+
+```
