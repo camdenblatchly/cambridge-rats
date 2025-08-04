@@ -5,6 +5,8 @@ format: html
 editor: visual
 ---
 
+Create visuals of rat-related 311 requests over time for Cambridge and Somerville, MA
+
 ```{r}
 
 library(dplyr)
@@ -13,6 +15,13 @@ library(sf)
 library(here)
 library(readr)
 library(lubridate)
+library(cori.charts)
+library(ggplot2)
+
+sysfonts::font_add_google("Fira Sans")
+sysfonts::font_add_google("EB Garamond")
+showtext::showtext_auto()
+showtext::showtext_opts(dpi = 300)
 
 i_am("scripts/rats_over_time.qmd")
 
@@ -21,7 +30,7 @@ i_am("scripts/rats_over_time.qmd")
 ```{r}
 
 somerville_311 <- read_csv(here("data/somerville_311.csv"))
-cambridge_311 <- read_csv(here("data/Cambridge_MA_Commonwealth_Connect_Service_Requests_20250729.csv"))
+cambridge_311 <- read_csv(here("data/cambridge_ma_311_rat_flags_data.csv"))
 
 ```
 
@@ -51,29 +60,40 @@ cambridge_trends <- cambridge_311_clean %>%
   group_by(year) %>%
   summarise(
     total = n(),
-    rodent = sum(issue_type == "Rodent Sighting"),
-    rodent_pct = (rodent / total) * 100
+    rat = sum(is_likely_rat == TRUE),
+    rat_pct = (rat / total) * 100
   )
 
 ```
 
 ```{r}
 
-library(ggplot2)
-
 fig <- cambridge_trends %>%
   filter(year > 2015 & year < 2025) %>%
-  ggplot(aes(x = year, y = rodent)) +
-    geom_line(color = "darkred", size = 1) +
-    geom_point(color = "darkred", size = 2) +
-    labs(
-      title = "Cambridge 311",
-      x = "Year",
-      y = "Value"
-    ) +
-    theme_minimal()
+  ggplot(aes(x = year, y = rat)) +
+  geom_line(color = "darkred", size = 1) +
+  geom_point(color = "darkred", size = 2) +
+  scale_y_continuous(
+    labels = scales::label_comma(accuracy = 1)
+  ) +
+  scale_x_continuous(
+    expand = expansion(mult = c(0.01, 0.05))
+  ) +
+  labs(
+    title = "Cambridge rat reports have declined since their 2021 peak",
+    subtitle = "Number of rat-related 311 reports in Cambridge, MA since 2016",
+    x = NULL,
+    y = NULL,
+    caption = "Source: Cambridge Commonwealth Connect Service (311) Requests"
+  ) +
+  theme_cori(title_family = "Fira Sans", base_family = "EB Garamond") +
+  theme(
+    axis.ticks.length.x = unit(8, "pt"),
+    axis.ticks.x = element_line(color = "#d0d2ce", linewidth = .25)
+  )
 
-fig
+save_plot(fig, here("exports/cambridge_ma_rat_311_reports_over_time.png"), add_logo = FALSE)
+
 ```
 
 ```{r}

@@ -5,6 +5,8 @@ format: html
 editor: visual
 ---
 
+Create census block level estimates of 311 rat requests for the cities of Somerville and Cambridge, MA.
+
 ```{r}
 
 library(dplyr)
@@ -23,6 +25,8 @@ i_am("scripts/rats_spatial.qmd")
 somerville_311 <- read_csv(here("data/somerville_311.csv"))
 cambridge_311 <- read_csv(here("data/cambridge_ma_311_rat_flags_data.csv"))
 
+# Filter to only likely rat reports
+# see scripts/create_full_rats_dataset.qmd for how I determined this flag
 cambridge_rats_only <- cambridge_311 %>%
   filter(is_likely_rat == TRUE)
 
@@ -30,6 +34,7 @@ cambridge_rats_only <- cambridge_311 %>%
 
 ```{r}
 
+# Clean GEOID and years
 somerville_311_clean <- somerville_311 %>%
   mutate(
     geoid_bl = stringr::str_pad(`Block Code`, 15, side = "left", pad = "0")
@@ -40,6 +45,7 @@ somerville_311_clean <- somerville_311 %>%
   ) %>%
   filter(year > 2015 & year < 2025)
   
+# Format year and lat/lon data
 cambridge_311_clean <- cambridge_311 %>%
   st_as_sf(coords = c("lng", "lat"), crs = 4326) %>%
   mutate(
@@ -53,9 +59,7 @@ cambridge_311_clean <- cambridge_311 %>%
 
 ```{r}
 
-# Let's map where 311 requests are happening
-# Note: Do we need to normalize on area? Dot density?
-
+# Pull in Census block data to create a block-level map of rat reports
 middlesex_co_bl <- tigris::blocks("MA", county = "017", year = 2020) %>%
   tigris::erase_water() %>%
   st_make_valid()
@@ -93,11 +97,13 @@ cambridge_rat_bl_dta <- cambridge_311_clean %>%
     # Total 311 requests
     avg_total = mean(total, na.rm = TRUE),
     median_total = median(total, na.rm = TRUE),
+    # Per area values
     avg_total_pa = avg_total / aland,
     median_total_pa = median_total / aland,
     # Rodent requests
     avg_rat = mean(rat, na.rm = TRUE),
     median_rat = median(rat, na.rm = TRUE),
+    # Per area values
     avg_rat_pa = avg_rat/ aland,
     median_rat_pa = median_rat / aland
   ) %>%

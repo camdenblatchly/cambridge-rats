@@ -5,6 +5,8 @@ format: html
 editor: visual
 ---
 
+Build a rigorous and complete dataset of rat-related 311 requests in Cambridge, MA
+
 ```{r}
 
 library(dplyr)
