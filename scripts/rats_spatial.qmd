@@ -23,6 +23,9 @@ i_am("scripts/rats_spatial.qmd")
 somerville_311 <- read_csv(here("data/somerville_311.csv"))
 cambridge_311 <- read_csv(here("data/cambridge_ma_311_rat_flags_data.csv"))
 
+cambridge_rats_only <- cambridge_311 %>%
+  filter(is_likely_rat == TRUE)
+
 ```
 
 ```{r}
